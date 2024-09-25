@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema({
   walletAddress: { type: String, unique: true, sparse: true },
   currentSpot: { type: Number, min: 1, max: 6 },
   lastFishTime: Date,
+  lastBaitTime: Date,
   xp: { type: Number, default: 0 },
   points: { type: Number, default: 0 },
   inventory: [

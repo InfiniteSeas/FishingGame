@@ -1,4 +1,5 @@
 const fetchPolyfill = require("./polyfills");
+const { EmbedBuilder } = require("discord.js");
 fetchPolyfill().then(() => {
   require("dotenv").config();
   const {
@@ -81,6 +82,9 @@ fetchPolyfill().then(() => {
           .setDescription("The invite code")
           .setRequired(true)
       ),
+    new SlashCommandBuilder()
+      .setName("leaderboard")
+      .setDescription("Displays individual and spot-based leaderboards"),
   ].map((command) => command.toJSON());
 
   const rest = new REST({ version: "10" }).setToken(TOKEN);
@@ -234,11 +238,11 @@ fetchPolyfill().then(() => {
           return;
         }
 
-        // Check the cooldown (1 hour)
+        // Check the cooldown (5 minutes)
         const now = new Date();
-        if (user.lastFishTime && now - user.lastFishTime < 3600000) {
-          // 1 hour in milliseconds
-          const timeLeft = 3600000 - (now - user.lastFishTime);
+        if (user.lastFishTime && now - user.lastFishTime < 300000) {
+          // 5 minutes in milliseconds
+          const timeLeft = 300000 - (now - user.lastFishTime);
           const minutesLeft = Math.floor(timeLeft / 60000);
           const secondsLeft = Math.floor((timeLeft % 60000) / 1000);
           await interaction.reply({
@@ -293,6 +297,20 @@ fetchPolyfill().then(() => {
           return;
         }
 
+        // Check the cooldown (5 minutes)
+        const now = new Date();
+        if (user.lastBaitTime && now - user.lastBaitTime < 300000) {
+          // 5 minutes in milliseconds
+          const timeLeft = 300000 - (now - user.lastBaitTime);
+          const minutesLeft = Math.floor(timeLeft / 60000);
+          const secondsLeft = Math.floor((timeLeft % 60000) / 1000);
+          await interaction.reply({
+            content: `You need to wait ${minutesLeft} minutes and ${secondsLeft} seconds before using bait again.`,
+            ephemeral: true,
+          });
+          return;
+        }
+
         // Check if the user has the specified fish in their inventory
         const baitFish = await Fish.findOne({ name: baitFishName });
         if (!baitFish) {
@@ -322,35 +340,31 @@ fetchPolyfill().then(() => {
           );
         }
 
-        // Randomly select a higher-ranked fish
-        const higherRankedFish = await Fish.find({
-          pointValue: { $gt: baitFish.pointValue },
-        });
-        if (higherRankedFish.length === 0) {
-          await interaction.reply({
-            content: `There are no higher-ranked fish available.`,
-            ephemeral: true,
-          });
-          return;
-        }
+        // Get all fish
+        const allFish = await Fish.find();
 
-        const randomFish = selectRandomFish(higherRankedFish);
+        // Calculate probabilities based on the bait fish
+        const fishProbabilities = calculateFishProbabilities(baitFish, allFish);
+
+        // Select a fish based on the new probabilities
+        const caughtFish = selectRandomFishWithProbabilities(fishProbabilities);
 
         // Update the user's inventory, points, and XP
         const newInventoryItem = user.inventory.find((item) =>
-          item.fishId.equals(randomFish._id)
+          item.fishId.equals(caughtFish._id)
         );
         if (newInventoryItem) {
           newInventoryItem.quantity += 1;
         } else {
-          user.inventory.push({ fishId: randomFish._id, quantity: 1 });
+          user.inventory.push({ fishId: caughtFish._id, quantity: 1 });
         }
-        user.points += randomFish.pointValue;
-        user.xp += randomFish.pointValue; // Assuming XP is equal to point value for simplicity
+        user.points += caughtFish.pointValue;
+        user.xp += caughtFish.pointValue; // Assuming XP is equal to point value for simplicity
+        user.lastBaitTime = now;
         await user.save();
 
         await interaction.reply({
-          content: `You used a ${baitFish.name} as bait and caught a ${randomFish.name}! You earned ${randomFish.pointValue} points and XP.`,
+          content: `You used a ${baitFish.name} as bait and caught a ${caughtFish.name}! You earned ${caughtFish.pointValue} points and XP.`,
           ephemeral: true,
         });
       } catch (error) {
@@ -564,6 +578,56 @@ fetchPolyfill().then(() => {
           ephemeral: true,
         });
       }
+    } else if (commandName === "leaderboard") {
+      try {
+        // Fetch top 10 users by points
+        const topUsers = await User.find().sort({ points: -1 }).limit(10);
+
+        // Fetch top spots
+        const topSpots = await User.aggregate([
+          { $group: { _id: "$currentSpot", totalPoints: { $sum: "$points" } } },
+          { $sort: { totalPoints: -1 } },
+          { $limit: 5 },
+        ]);
+
+        // Create embeds for leaderboards
+        const individualLeaderboard = new EmbedBuilder()
+          .setColor("#0099ff")
+          .setTitle("Individual Leaderboard")
+          .setDescription(
+            topUsers
+              .map(
+                (user, index) =>
+                  `${index + 1}. <@${user.discordId}>: ${user.points} points`
+              )
+              .join("\n")
+          );
+
+        const spotLeaderboard = new EmbedBuilder()
+          .setColor("#00ff99")
+          .setTitle("Spot Leaderboard")
+          .setDescription(
+            topSpots
+              .map(
+                (spot, index) =>
+                  `${index + 1}. Spot #${spot._id}: ${spot.totalPoints} points`
+              )
+              .join("\n")
+          );
+
+        await interaction.reply({
+          content: "Here are the current leaderboards:",
+          embeds: [individualLeaderboard, spotLeaderboard],
+          ephemeral: true,
+        });
+      } catch (error) {
+        console.error("Error fetching leaderboard:", error);
+        await interaction.reply({
+          content:
+            "There was an error fetching the leaderboard. Please try again later.",
+          ephemeral: true,
+        });
+      }
     }
   });
 
@@ -585,4 +649,62 @@ function selectRandomFish(fishList) {
       return fish;
     }
   }
+}
+
+// Add these new functions at the end of your file:
+
+function calculateFishProbabilities(baitFish, allFish) {
+  const rarityOrder = [
+    "Common",
+    "Uncommon",
+    "Rare",
+    "Super Rare",
+    "Epic",
+    "Legendary",
+    "Mythical",
+  ];
+  const probabilityIncrease = {
+    Common: [0.1, 0.05, 0.02, 0.01, 0.005, 0.001],
+    Uncommon: [0.15, 0.07, 0.03, 0.015, 0.01, 0.002],
+    Rare: [0.2, 0.1, 0.05, 0.03, 0.02, 0.005],
+    "Super Rare": [0.25, 0.15, 0.08, 0.05, 0.03, 0.01],
+    Epic: [0.3, 0.2, 0.1, 0.07, 0.05, 0.02],
+    Legendary: [0.35, 0.25, 0.15, 0.1, 0.07, 0.03],
+    Mythical: [0.4, 0.3, 0.2, 0.15, 0.1, 0.05],
+  };
+
+  const baitRarityIndex = rarityOrder.indexOf(baitFish.rarity);
+
+  return allFish.map((fish) => {
+    const fishRarityIndex = rarityOrder.indexOf(fish.rarity);
+    let probability = fish.probability;
+
+    if (fishRarityIndex > baitRarityIndex) {
+      probability +=
+        probabilityIncrease[baitFish.rarity][
+          fishRarityIndex - baitRarityIndex - 1
+        ];
+    }
+
+    return { fish, probability };
+  });
+}
+
+function selectRandomFishWithProbabilities(fishProbabilities) {
+  const totalProbability = fishProbabilities.reduce(
+    (sum, { probability }) => sum + probability,
+    0
+  );
+  const random = Math.random() * totalProbability;
+  let cumulativeProbability = 0;
+
+  for (const { fish, probability } of fishProbabilities) {
+    cumulativeProbability += probability;
+    if (random <= cumulativeProbability) {
+      return fish;
+    }
+  }
+
+  // In case of rounding errors, return the last fish
+  return fishProbabilities[fishProbabilities.length - 1].fish;
 }
