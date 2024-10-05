@@ -1,7 +1,5 @@
 const fetchPolyfill = require("./polyfills");
 const { EmbedBuilder } = require("discord.js");
-const levels = require("./levels");
-const { EMOJIS } = require("./constants");
 fetchPolyfill().then(() => {
   require("dotenv").config();
   const {
@@ -12,7 +10,7 @@ fetchPolyfill().then(() => {
   } = require("discord.js");
   const { REST } = require("@discordjs/rest");
   const mongoose = require("mongoose");
-  const { User, Fish, Guild, Spot, SubmittedFish } = require("./schemas"); // Import the User, Fish, Guild, and Spot models
+  const { User, Fish, Guild, Spot } = require("./schemas"); // Import the User, Fish, Guild, and Spot models
 
   const TOKEN = process.env.DISCORD_BOT_TOKEN;
   const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
@@ -50,59 +48,21 @@ fetchPolyfill().then(() => {
     new SlashCommandBuilder()
       .setName("fishingwbait")
       .setDescription(
-        "Fish using specific rarities of fish as bait for a higher chance"
-      )
-      .addIntegerOption((option) =>
-        option
-          .setName("num")
-          .setDescription("The number of baits to use (1-3)")
-          .setRequired(true)
-          .setMinValue(1)
-          .setMaxValue(3)
+        "Fish using a specific rarity of fish as bait for a higher chance"
       )
       .addStringOption((option) =>
         option
-          .setName("bait1")
-          .setDescription("The rarity of the first bait fish")
+          .setName("bait")
+          .setDescription("The rarity of fish to use as bait")
           .setRequired(true)
           .addChoices(
-            { name: "Common", value: "common" },
-            { name: "Uncommon", value: "uncommon" },
-            { name: "Rare", value: "rare" },
-            { name: "Super Rare", value: "super rare" },
-            { name: "Epic", value: "epic" },
-            { name: "Legendary", value: "legendary" },
-            { name: "Mythical", value: "mythical" }
-          )
-      )
-      .addStringOption((option) =>
-        option
-          .setName("bait2")
-          .setDescription("The rarity of the second bait fish")
-          .setRequired(false)
-          .addChoices(
-            { name: "Common", value: "common" },
-            { name: "Uncommon", value: "uncommon" },
-            { name: "Rare", value: "rare" },
-            { name: "Super Rare", value: "super rare" },
-            { name: "Epic", value: "epic" },
-            { name: "Legendary", value: "legendary" },
-            { name: "Mythical", value: "mythical" }
-          )
-      )
-      .addStringOption((option) =>
-        option
-          .setName("bait3")
-          .setDescription("The rarity of the third bait fish")
-          .setRequired(false)
-          .addChoices(
-            { name: "Common", value: "common" },
-            { name: "Uncommon", value: "uncommon" },
-            { name: "Rare", value: "rare" },
-            { name: "Super Rare", value: "super rare" },
-            { name: "Epic", value: "epic" },
-            { name: "Legendary", value: "legendary" },
-            { name: "Mythical", value: "mythical" }
+            { name: "Common", value: "Common" },
+            { name: "Uncommon", value: "Uncommon" },
+            { name: "Rare", value: "Rare" },
+            { name: "Super Rare", value: "Super Rare" },
+            { name: "Epic", value: "Epic" },
+            { name: "Legendary", value: "Legendary" },
+            { name: "Mythical", value: "Mythical" }
           )
       ),
     new SlashCommandBuilder()
@@ -152,34 +112,6 @@ fetchPolyfill().then(() => {
     new SlashCommandBuilder()
       .setName("fishercount")
       .setDescription("Check how many fishers are at each spot"),
-    new SlashCommandBuilder()
-      .setName("createfish")
-      .setDescription("Customize your most recently caught rare or higher fish")
-      .addStringOption((option) =>
-        option
-          .setName("rarity")
-          .setDescription("The rarity of the fish you want to customize")
-          .setRequired(true)
-          .addChoices(
-            { name: "Rare", value: "rare" },
-            { name: "Super Rare", value: "super rare" },
-            { name: "Epic", value: "epic" },
-            { name: "Legendary", value: "legendary" },
-            { name: "Mythical", value: "mythical" }
-          )
-      )
-      .addStringOption((option) =>
-        option
-          .setName("name")
-          .setDescription("The new name for your fish")
-          .setRequired(true)
-      )
-      .addStringOption((option) =>
-        option
-          .setName("image")
-          .setDescription("The new image URL for your fish")
-          .setRequired(true)
-      ),
   ].map((command) => command.toJSON());
 
   const rest = new REST({ version: "10" }).setToken(TOKEN);
@@ -204,20 +136,40 @@ fetchPolyfill().then(() => {
 
   const FISHING_COOLDOWN = 1 * 10 * 1000; // 2 minutes in milliseconds
 
-  const baitInfluence = {
-    "no bait": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-    common: [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6],
-    uncommon: [0.9, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6],
-    rare: [0.8, 0.9, 1.2, 1.3, 1.4, 1.5, 1.6],
-    "super rare": [0.7, 0.8, 0.9, 1.3, 1.4, 1.5, 1.6],
-    epic: [0.6, 0.7, 0.8, 0.9, 1.4, 1.5, 1.6],
-    legendary: [0.5, 0.6, 0.7, 0.8, 0.9, 1.5, 1.6],
-    mythical: [0.5, 0.5, 0.6, 0.7, 0.8, 0.9, 1.6],
+  const fishProbabilities = {
+    "no bait": [0.5, 0.25, 0.12, 0.06, 0.04, 0.02, 0.01],
+    common: [0.5, 0.25, 0.12, 0.06, 0.04, 0.02, 0.01],
+    uncommon: [0.4, 0.3, 0.15, 0.08, 0.04, 0.02, 0.01],
+    rare: [0.3, 0.3, 0.18, 0.1, 0.06, 0.04, 0.02],
+    "super rare": [0.2, 0.28, 0.2, 0.12, 0.08, 0.06, 0.04],
+    epic: [0.15, 0.25, 0.22, 0.14, 0.1, 0.08, 0.04],
+    legendary: [0.1, 0.2, 0.24, 0.15, 0.12, 0.1, 0.04],
+    mythical: [0.05, 0.15, 0.2, 0.18, 0.15, 0.12, 0.1],
   };
 
-  const DIMINISHING_FACTOR = 0.2;
+  function adjustProbabilitiesForGuildSize(probabilities, guildSize) {
+    const baseAdjustment = 0.05; // 5% base adjustment per guild member
+    const maxGuildSize = 5;
+    const effectiveGuildSize = Math.min(guildSize, maxGuildSize) - 1;
 
-  function calculateFishProbabilities(baitRarities, spotFishPopulation) {
+    return probabilities.map((prob, index) => {
+      const rarityFactor =
+        (probabilities.length - index) / probabilities.length;
+      const adjustment = baseAdjustment * effectiveGuildSize * rarityFactor;
+
+      if (index === 0) {
+        return Math.max(0.1, prob - adjustment); // Ensure Common doesn't go below 10%
+      } else {
+        return prob + adjustment / (probabilities.length - 1);
+      }
+    });
+  }
+
+  function calculateFishProbabilities(
+    baitRarity,
+    spotFishPopulation,
+    guildSize = 1
+  ) {
     const rarityOrder = [
       "common",
       "uncommon",
@@ -228,47 +180,20 @@ fetchPolyfill().then(() => {
       "mythical",
     ];
 
-    console.log("Bait rarities:", baitRarities);
+    const baitType = baitRarity ? baitRarity.toLowerCase() : "no bait";
+    console.log("Bait type:", baitType);
 
-    // Base weights for each fish rarity
-    const baseWeights = [500, 250, 120, 60, 40, 20, 10];
+    const baitProbabilities =
+      fishProbabilities[baitType] || fishProbabilities["no bait"];
+    console.log("Bait probabilities:", baitProbabilities);
 
-    // Initialize total multipliers to 1 for each rarity
-    let totalMultipliers = [1, 1, 1, 1, 1, 1, 1];
-
-    // Apply bait influences with diminishing returns
-    baitRarities.forEach((bait, index) => {
-      const multipliers = baitInfluence[bait];
-      const diminishingFactor = 1 - DIMINISHING_FACTOR * index;
-
-      for (let i = 0; i < multipliers.length; i++) {
-        // Calculate additional multiplier beyond 1
-        const additionalMultiplier = (multipliers[i] - 1) * diminishingFactor;
-        // Add to the total multiplier
-        totalMultipliers[i] += additionalMultiplier;
-      }
-    });
-
-    console.log("Total Multipliers:", totalMultipliers);
-
-    // Calculate adjusted weights
-    const adjustedWeights = baseWeights.map(
-      (weight, index) => weight * totalMultipliers[index]
+    // Adjust probabilities based on guild size
+    const adjustedBaitProbabilities = adjustProbabilitiesForGuildSize(
+      baitProbabilities,
+      guildSize
     );
+    console.log("Adjusted bait probabilities:", adjustedBaitProbabilities);
 
-    console.log("Adjusted Weights:", adjustedWeights);
-
-    // Sum adjusted weights
-    const totalAdjustedWeight = adjustedWeights.reduce((a, b) => a + b, 0);
-
-    // Calculate final probabilities
-    const finalProbabilities = adjustedWeights.map(
-      (w) => w / totalAdjustedWeight
-    );
-
-    console.log("Final Probabilities:", finalProbabilities);
-
-    // Map fishInSpot to probabilities
     const result = spotFishPopulation.map((fishInSpot) => {
       const fish = fishInSpot.fish;
       const fishRarityIndex = rarityOrder.indexOf(fish.rarity.toLowerCase());
@@ -278,8 +203,8 @@ fetchPolyfill().then(() => {
         return { fish, probability: 0 };
       }
 
-      // Get the final probability for the fish rarity
-      let baseProbability = finalProbabilities[fishRarityIndex];
+      // Get the base probability from the bait probabilities
+      let baseProbability = adjustedBaitProbabilities[fishRarityIndex];
 
       // Adjust probability based on the quantity of fish in the spot
       // Using square root to soften the effect of quantity
@@ -309,9 +234,10 @@ fetchPolyfill().then(() => {
     return normalizedResult;
   }
 
-  async function fishAtSpot(user, baitRarities, spot) {
-    console.log("Bait rarities:", baitRarities);
+  async function fishAtSpot(user, baitRarity, spot, guildSize) {
+    console.log("Bait rarity:", baitRarity);
     console.log("Spot:", spot);
+    console.log("Guild size:", guildSize);
 
     if (!spot || !spot.fishPopulation || !Array.isArray(spot.fishPopulation)) {
       console.error("Invalid spot or fish population");
@@ -322,8 +248,9 @@ fetchPolyfill().then(() => {
     }
 
     const fishProbabilities = calculateFishProbabilities(
-      baitRarities,
-      spot.fishPopulation
+      baitRarity,
+      spot.fishPopulation,
+      guildSize
     );
 
     console.log("Fish probabilities:", fishProbabilities);
@@ -368,6 +295,27 @@ fetchPolyfill().then(() => {
     return { success: true, fishId: caughtFish._id.toString() };
   }
 
+  function getXPForFish(rarity) {
+    switch (rarity.toLowerCase()) {
+      case "common":
+        return 10;
+      case "uncommon":
+        return 25;
+      case "rare":
+        return 50;
+      case "super rare":
+        return 100;
+      case "epic":
+        return 200;
+      case "legendary":
+        return 500;
+      case "mythical":
+        return 1000;
+      default:
+        return 10;
+    }
+  }
+
   function checkFishingCooldown(user) {
     const now = new Date();
     if (user.lastFishingTime) {
@@ -382,7 +330,7 @@ fetchPolyfill().then(() => {
             minutesLeft !== 1 ? "s" : ""
           } and ${secondsLeft} second${
             secondsLeft !== 1 ? "s" : ""
-          } before using \`/catch\`.`,
+          } before using /catch.`,
         };
       }
     }
@@ -391,40 +339,17 @@ fetchPolyfill().then(() => {
 
   function getSpotDescription(spotNumber) {
     const descriptions = [
-      `${EMOJIS.SPOTS[1]} A calm bay with crystal clear waters.`,
-      `${EMOJIS.SPOTS[2]} A rocky shoreline with crashing waves.`,
-      `${EMOJIS.SPOTS[3]} A secluded cove surrounded by lush vegetation.`,
-      `${EMOJIS.SPOTS[4]} A deep sea area known for its large fish.`,
-      `${EMOJIS.SPOTS[5]} A tropical reef teeming with colorful marine life.`,
-      `${EMOJIS.SPOTS[6]} A mysterious underwater cave system.`,
+      "A calm bay with crystal clear waters.",
+      "A rocky shoreline with crashing waves.",
+      "A secluded cove surrounded by lush vegetation.",
+      "A deep sea area known for its large fish.",
+      "A tropical reef teeming with colorful marine life.",
+      "A mysterious underwater cave system.",
     ];
 
     // Ensure the spotNumber is within the valid range
     const index = (spotNumber - 1) % descriptions.length;
     return descriptions[index];
-  }
-
-  function generateProgressBar(current, max, size = 20) {
-    const percentage = current / max;
-    const filled = Math.round(size * percentage);
-    const empty = size - filled;
-    return "█".repeat(filled) + "░".repeat(empty);
-  }
-
-  function getAvailablePools(level) {
-    if (level >= 20) return [1, 2, 3, 4, 5, 6];
-    if (level >= 15) return [1, 2, 3, 4, 5];
-    if (level >= 10) return [1, 2, 3, 4];
-    if (level >= 5) return [1, 2, 3];
-    return [1, 2];
-  }
-
-  function getMaxJoinablePool(level) {
-    if (level >= 20) return 6;
-    if (level >= 15) return 5;
-    if (level >= 10) return 5;
-    if (level >= 5) return 4;
-    return 3;
   }
 
   client.on("interactionCreate", async (interaction) => {
@@ -481,9 +406,6 @@ fetchPolyfill().then(() => {
         case "quitguild":
           handled = await handleQuitGuild(interaction);
           break;
-        case "createfish":
-          handled = await handleCreateFish(interaction);
-          break;
         default:
           if (!interaction.replied && !interaction.deferred) {
             await interaction.reply({
@@ -537,7 +459,8 @@ fetchPolyfill().then(() => {
       await user.save();
 
       await interaction.reply({
-        content: `Welcome to the Infinite Seas ${EMOJIS.MISC.SEA} - You're now ready to start your fishing adventure. Use  \`/findspot\` to locate your first fishing spot!`,
+        content:
+          "Welcome to the Infinite Seas! You're now ready to start your fishing adventure. Use `/findspot` to locate your first fishing spot!",
         ephemeral: true,
       });
       return true;
@@ -547,12 +470,9 @@ fetchPolyfill().then(() => {
     }
   }
 
-  const REROLL_COOLDOWN = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
-
   async function handleFindSpot(interaction) {
     try {
       let user = await User.findOne({ discordId: interaction.user.id });
-      console.log("User found for findspot:", user ? "Yes" : "No");
 
       if (!user) {
         await interaction.reply({
@@ -563,62 +483,49 @@ fetchPolyfill().then(() => {
         return true;
       }
 
-      // Check if enough time has passed since the last spot change
-      if (
-        user.lastRerollTime &&
-        Date.now() - user.lastRerollTime < REROLL_COOLDOWN
-      ) {
-        const timeLeft = REROLL_COOLDOWN - (Date.now() - user.lastRerollTime);
-        const hoursLeft = Math.floor(timeLeft / (60 * 60 * 1000));
-        const minutesLeft = Math.floor(
-          (timeLeft % (60 * 60 * 1000)) / (60 * 1000)
-        );
+      const findNew = interaction.options.getBoolean("new") || false;
 
-        let currentSpotDescription = getSpotDescription(user.currentSpot);
-        let currentFisherCount = await User.countDocuments({
+      // If user is in a spot and doesn't want a new one, just inform them of their current spot
+      if (user.currentSpot && !findNew) {
+        const spotDescription = getSpotDescription(user.currentSpot);
+        const fisherCount = await User.countDocuments({
           currentSpot: user.currentSpot,
         });
 
         await interaction.reply({
-          content: `You can't change your spot for another ${hoursLeft} hours and ${minutesLeft} minutes. 
-  
-  You're currently at Fishing Spot #${user.currentSpot}: ${currentSpotDescription} 
-  There are ${currentFisherCount} fishers here (including you).
-  
+          content: `You're at Fishing Spot #${user.currentSpot}: ${spotDescription} There are currently ${fisherCount} fishers here (including you). 
+
 Your options:
-• ${EMOJIS.ACTIONS.FISHING} \`/fishing\` to cast your line without bait
-��� ${EMOJIS.ACTIONS.BAIT} \`/fishingwbait\` to fish using one of your fish as bait for a higher chance
-• ${EMOJIS.ACTIONS.INVITE} \`/invite\` to create a guild at this spot
-• ${EMOJIS.ACTIONS.GUILD} \`/join\` to move to another fisher's spot (if invited)
-• ${EMOJIS.STATS.FISHERCOUNT} \`/fishercount\` to check how many fishers are at each spot`,
+• /fishing to cast your line without bait
+• /fishingwbait to fish using one of your fish as bait for a higher chance
+• /invite to create a guild at this spot
+• /join to move to another fisher's spot
+• /fishercount to check how many fishers are at each spot
+
+If you want to find a new spot, use /findspot new:true`,
           ephemeral: true,
         });
         return true;
       }
 
-      // Determine available pools based on user's level
-      const availablePools = getAvailablePools(user.level);
+      // Generate a new random spot (1-6)
+      const newSpot = Math.floor(Math.random() * 6) + 1;
 
-      // Generate a new random spot from available pools
-      const newSpot =
-        availablePools[Math.floor(Math.random() * availablePools.length)];
-      user.previousSpot = user.currentSpot;
+      // Update user's spot
       user.currentSpot = newSpot;
-      user.lastSpotChangeTime = Date.now();
       await user.save();
 
       const spotDescription = getSpotDescription(newSpot);
+      const fisherCount = await User.countDocuments({ currentSpot: newSpot });
 
-      const { ACTIONS, MISC, STATS } = EMOJIS;
-      const responseMessage = `You have arrived at Fishing Spot #${newSpot}: ${spotDescription}
+      const responseMessage = `You have arrived at Fishing Spot #${newSpot}: ${spotDescription} There are currently ${fisherCount} fishers here (including you). The more people at a spot, the lower your chances of catching rare fish!
 
 Your options:
-• ${ACTIONS.FISHING} \`/fishing\` to cast your line without bait
-• ${ACTIONS.BAIT} \`/fishingwbait\` to fish using bait for better chances
-• ${ACTIONS.GUILD} \`/invite\` to create a guild at this spot
-• ${STATS.LEVEL} \`/fishercount\` to check how many fishers are at each spot
-
-${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
+• /fishing to cast your line without bait
+• /fishingwbait to fish using one of your fish as bait for a higher chance
+• /invite to create a guild at this spot
+• /join to move to another fisher's spot
+• /fishercount to check how many fishers are at each spot`;
 
       await interaction.reply({
         content: responseMessage,
@@ -666,51 +573,36 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
         return true;
       }
 
-      let baitRarities = [];
+      let baitRarity = null;
       if (useBait) {
-        const numBaits = interaction.options.getInteger("num");
+        baitRarity = interaction.options.getString("bait");
+        console.log("Selected bait rarity:", baitRarity);
 
-        for (let i = 1; i <= numBaits; i++) {
-          const bait = interaction.options.getString(`bait${i}`);
-          if (bait) {
-            baitRarities.push(bait);
-          }
-        }
+        // Check if the user has a fish of the selected rarity
+        const baitFishIndex = user.inventory.findIndex(
+          (item) =>
+            item.fishId &&
+            item.fishId.rarity &&
+            item.fishId.rarity.toLowerCase() === baitRarity.toLowerCase() &&
+            item.quantity > 0
+        );
 
-        if (baitRarities.length !== numBaits) {
+        if (baitFishIndex === -1) {
           await interaction.reply({
-            content: `You specified ${numBaits} baits, but only provided ${baitRarities.length}. Please provide the correct number of baits.`,
+            content: `You don't have any ${baitRarity} fish to use as bait!`,
             ephemeral: true,
           });
           return true;
         }
 
-        for (let bait of baitRarities) {
-          const baitFishIndex = user.inventory.findIndex(
-            (item) =>
-              item.fishId &&
-              item.fishId.rarity &&
-              item.fishId.rarity.toLowerCase() === bait &&
-              item.quantity > 0
-          );
-
-          if (baitFishIndex === -1) {
-            await interaction.reply({
-              content: `You don't have any ${bait} fish to use as bait!`,
-              ephemeral: true,
-            });
-            return true;
-          }
-
-          // Remove one fish of the bait rarity from the user's inventory
-          user.inventory[baitFishIndex].quantity -= 1;
-          if (user.inventory[baitFishIndex].quantity === 0) {
-            user.inventory.splice(baitFishIndex, 1);
-          }
+        // Remove one fish of the bait rarity from the user's inventory
+        user.inventory[baitFishIndex].quantity -= 1;
+        if (user.inventory[baitFishIndex].quantity === 0) {
+          user.inventory.splice(baitFishIndex, 1);
         }
         await user.save();
         console.log(
-          `Removed ${baitRarities.length} fish from user's inventory for bait`
+          `Removed one ${baitRarity} fish from user's inventory for bait`
         );
       }
 
@@ -727,8 +619,13 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
         return true;
       }
 
-      // Use fishAtSpot function with multiple baits
-      const fishingResult = await fishAtSpot(user, baitRarities, spot);
+      const guild = await Guild.findOne({ _id: user.guild });
+      const guildSize = guild ? guild.members.length : 1;
+
+      console.log("Guild size:", guildSize);
+
+      // Use fishAtSpot function
+      const fishingResult = await fishAtSpot(user, baitRarity, spot, guildSize);
       console.log("Fishing result:", fishingResult);
 
       if (!fishingResult.success) {
@@ -745,19 +642,18 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
       user.pendingCatch = {
         time: now,
         fishId: fishingResult.fishId,
-        baitUsed: useBait ? baitRarities : null,
+        baitUsed: useBait ? baitRarity : null,
       };
       await user.save();
       console.log("Updated user pendingCatch:", user.pendingCatch);
 
       const cooldownCheck = checkFishingCooldown(user);
 
-      const { ACTIONS, MISC } = EMOJIS;
       let fishingMessage = useBait
-        ? `${ACTIONS.FISHING} ${ACTIONS.BAIT} You cast your line with bait and feel a strong tug! `
-        : `${ACTIONS.FISHING} You cast your line and feel something bite! `;
-      fishingMessage += `${MISC.INFO} The fish will remain hidden until you use \`/catch\` to reel it in. `;
-      fishingMessage += `${MISC.TIME} ${cooldownCheck.message}`;
+        ? "🎣 You cast your line with bait and feel a strong tug! "
+        : "🎣 You cast your line and feel something bite! ";
+      fishingMessage += `The fish will remain hidden until you use \`/catch\` to reel it in. `;
+      fishingMessage += cooldownCheck.message;
 
       await interaction.reply({
         content: fishingMessage,
@@ -777,9 +673,7 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
 
   async function handleCatch(interaction) {
     try {
-      let user = await User.findOne({
-        discordId: interaction.user.id,
-      }).populate("guild");
+      let user = await User.findOne({ discordId: interaction.user.id });
       console.log("User found:", user ? "Yes" : "No");
 
       if (!user) {
@@ -849,65 +743,14 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
         user.inventory.push({ fishId: caughtFish._id, quantity: 1 });
       }
 
-      // Calculate XP for the caught fish
-      let xpGained = caughtFish.pointValue;
-
-      // Check if user is in a full guild and add bonus XP if so
-      if (user.guild && user.guild.members.length === 5) {
-        const bonusXP = {
-          common: 8,
-          uncommon: 15,
-          rare: 26,
-          "super rare": 43,
-          epic: 74,
-          legendary: 125,
-          mythical: 213,
-        };
-        xpGained += bonusXP[caughtFish.rarity.toLowerCase()] || 0;
-      }
-
-      // Add XP to user
-      const oldXP = user.xp;
+      // Add XP for the caught fish
+      const xpGained = getXPForFish(caughtFish.rarity);
       user.xp += xpGained;
-
-      // Calculate new level
-      let newLevel = user.level;
-      while (newLevel < levels.length && user.xp >= levels[newLevel].xp) {
-        newLevel++;
-      }
-
-      // Check if user leveled up
-      let levelUpMessage = "";
-      if (newLevel > user.level) {
-        levelUpMessage = `Congratulations! You've leveled up to level ${newLevel}!`;
-        user.level = newLevel;
-      }
-
-      // Calculate XP needed for next level
-      const currentLevelXP = levels[user.level - 1].xp;
-      const nextLevelXP =
-        user.level < levels.length
-          ? levels[user.level].xp
-          : levels[levels.length - 1].xp;
-      const xpForNextLevel = nextLevelXP - user.xp;
-
-      // Calculate progress bar
-      const progressBar = generateProgressBar(
-        user.xp - currentLevelXP,
-        nextLevelXP - currentLevelXP
-      );
-
-      // Calculate points needed for next pool
-      const nextPoolLevel = Math.ceil(user.level / 5) * 5;
-      const xpForNextPool =
-        nextPoolLevel <= levels.length
-          ? levels[nextPoolLevel - 1].xp - user.xp
-          : 0;
 
       // Clear the pending catch
       user.pendingCatch = null;
       await user.save();
-      console.log("User saved after catching fish and updating XP/level");
+      console.log("User saved after catching fish");
 
       // Decrease the fish population in the spot
       const spot = await Spot.findOne({ spotNumber: user.currentSpot });
@@ -926,34 +769,8 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
         }
       }
 
-      const { FISH, STATS, MISC, ACTIONS } = EMOJIS;
-      const emoji = FISH[caughtFish.rarity.toLowerCase()] || "";
-      let replyMessage = `${MISC.SUCCESS} Congratulations! You caught a ${emoji} ${caughtFish.name} (${caughtFish.rarity})! It has been added to your inventory. ${STATS.XP} You gained ${xpGained} XP!`;
-
-      if (user.guild && user.guild.members.length === 5) {
-        replyMessage += ` ${MISC.INFO} (Includes guild bonus XP!)`;
-      }
-
-      if (levelUpMessage) {
-        replyMessage += `\n${ACTIONS.LEVEL_UP} ${levelUpMessage}`;
-      }
-
-      replyMessage += `\n\n${STATS.LEVEL} Current Level: ${user.level}`;
-      replyMessage += `\n${MISC.PROGRESS} Progress: ${progressBar} (${
-        user.xp - currentLevelXP
-      }/${nextLevelXP - currentLevelXP})`;
-      replyMessage += `\n${
-        MISC.TIME
-      } You are ${xpForNextLevel} XP away from level ${user.level + 1}.`;
-
-      if (xpForNextPool > 0) {
-        replyMessage += `\n${ACTIONS.SPOT} You are ${xpForNextPool} XP away from unlocking the next pool at level ${nextPoolLevel}.`;
-      } else {
-        replyMessage += `\n${MISC.SUCCESS} You have unlocked all available pools!`;
-      }
-
       await interaction.reply({
-        content: replyMessage,
+        content: `Congratulations! You caught a ${caughtFish.name} (${caughtFish.rarity})! It has been added to your inventory. You gained ${xpGained} XP!`,
         ephemeral: true,
       });
       return true;
@@ -1042,26 +859,30 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
         return true;
       }
 
-      const { FISH, ACTIONS, STATS } = EMOJIS;
-      const inventoryList = user.inventory
-        .map((item, index) => {
-          const emoji = FISH[item.fishId.rarity.toLowerCase()] || "";
-          return `${index + 1}. ${emoji} ${item.fishId.rarity} ${
-            item.fishId.name
-          } (x${item.quantity})`;
+      const inventoryItems = await Promise.all(
+        user.inventory.map(async (item) => {
+          const fish = item.fishId;
+          if (!fish) {
+            console.error(`Fish not found for inventory item: ${item}`);
+            return `Unknown Fish: ${item.quantity}`;
+          }
+          return `${fish.name} (${fish.rarity}): ${item.quantity}`;
         })
-        .join("\n");
+      );
 
-      const inventoryMessage = `${ACTIONS.INVENTORY} Your Inventory:
-${inventoryList}
+      const totalXP = user.xp;
 
-${STATS.XP} Total XP: ${user.xp}
-${STATS.LEVEL} Current Level: ${user.level}`;
+      const embed = new EmbedBuilder()
+        .setColor(0x0099ff)
+        .setTitle(`${interaction.user.username}'s Inventory`)
+        .setDescription(inventoryItems.join("\n"))
+        .addFields({
+          name: "Total XP",
+          value: totalXP.toString(),
+          inline: true,
+        });
 
-      await interaction.reply({
-        content: inventoryMessage,
-        ephemeral: true,
-      });
+      await interaction.reply({ embeds: [embed], ephemeral: true });
       return true;
     } catch (error) {
       console.error("Error in handleInventory:", error);
@@ -1087,7 +908,7 @@ ${STATS.LEVEL} Current Level: ${user.level}`;
       }
 
       await interaction.reply({
-        content: `${EMOJIS.STATS.XP} Your current XP: ${user.xp}`,
+        content: `Your current XP: ${user.xp}`,
         ephemeral: true,
       });
       return true;
@@ -1110,30 +931,22 @@ ${STATS.LEVEL} Current Level: ${user.level}`;
         return true;
       }
 
-      let storyMessage = `Welcome to the Infinite Seas ${EMOJIS.MISC.SEA} - a vast and mysterious ocean teeming with countless fish species waiting to be discovered. As an adventurous fisher, your journey begins in the calm waters of Pool 1, where you'll hone your skills and learn the basics of fishing.
+      const storyContent = `In the vast expanse of the Infinite Seas, legends speak of ancient underwater civilizations and mythical creatures that dwell in its depths. As you cast your line into these mysterious waters, you're not just fishing – you're unraveling the secrets of a world beneath the waves.
 
-As you gain experience and level up, you'll unlock access to new, more challenging pools:
-• Pools 1 & 2: Available from Level 1
-• Pool 3: Unlocks at Level 5
-• Pool 4: Unlocks at Level 10
-• Pool 5: Unlocks at Level 15
-• Pool 6: Unlocks at Level 20
+Some say the fish here are descendants of long-lost magical beings, each scale telling a story of ages past. Others whisper of hidden treasures and sunken cities waiting to be discovered by those brave enough to explore the deepest trenches.
 
-Each pool offers unique fish species and increased chances of rare catches. Remember, you can always return to previous pools or join guilds in pools slightly above your level for added challenge and rewards.
+Your journey as a fisher is more than just a quest for the biggest catch. It's an adventure that will test your skills, forge new friendships in guilds, and perhaps even shape the future of these endless waters.
 
-Your current level: ${user.level}
-`;
+What mysteries will you uncover? What legendary creatures will you encounter? The Infinite Seas await your exploration, brave fisher!`;
 
-      if (user.level >= 25) {
-        storyMessage += `\nCongratulations on reaching Level 25! You've now unlocked the ability to create your own pools. Use the /createpool command to start shaping the Infinite Seas and leave your mark on this vast ocean. (Feature coming soon)`;
-      } else {
-        storyMessage += `\nAt Level 25, you'll unlock the ability to create your own pools, allowing you to shape the Infinite Seas and leave your mark on this vast ocean. Keep fishing and leveling up!`;
-      }
+      const responseMessage = `Here's a glimpse into the Infinite Seas:
 
-      storyMessage += `\n\nAs you progress, you'll discover rare fish, form powerful guilds, and uncover the secrets hidden beneath the waves. Will you become a legendary fisher, known throughout the Infinite Seas? The adventure awaits!`;
+${storyContent}
+
+As you continue your journey, more will be revealed!`;
 
       await interaction.reply({
-        content: storyMessage,
+        content: responseMessage,
         ephemeral: true,
       });
       return true;
@@ -1156,7 +969,8 @@ Your current level: ${user.level}
 
       if (!user) {
         await interaction.reply({
-          content: `${EMOJIS.MISC.FAIL} You need to connect first. Use the \`/connect\` command to join the Infinite Seas.`,
+          content:
+            "You need to connect first. Use the `/connect` command to join the Infinite Seas.",
           ephemeral: true,
         });
         return true;
@@ -1166,7 +980,8 @@ Your current level: ${user.level}
 
       if (!user.currentSpot) {
         await interaction.reply({
-          content: `${EMOJIS.MISC.WARNING} You need to select a fishing spot before creating a guild. Use the \`/findspot\` command to find a fishing spot.`,
+          content:
+            "You need to select a fishing spot before creating a guild. Use the `/findspot` command to find a fishing spot.",
           ephemeral: true,
         });
         return true;
@@ -1185,22 +1000,21 @@ Your current level: ${user.level}
           )
           .join("\n");
 
-        const { ACTIONS, MISC, STATS } = EMOJIS;
-        responseMessage = `${MISC.INFO} You're already in a guild named "${user.guild.name}".
+        responseMessage = `You're already in a guild named "${user.guild.name}".
 
-${ACTIONS.GUILD} Guild Information:
+Guild Information:
 • Members (${guildMembers.length}/${user.guild.maxMembers}):
 ${memberList}
-• ${ACTIONS.SPOT} Fishing Spot: #${user.guild.spot}
-• ${ACTIONS.INVITE} Invite Code: ${user.guild.inviteCode}
+• Fishing Spot: #${user.guild.spot}
+• Invite Code: ${user.guild.inviteCode}
 
-${MISC.INFO} Share this invite code with others to invite them to your guild!
+Share this invite code with others to invite them to your guild!
 
 Your options are:
-• ${ACTIONS.GUILD} \`/guildmember\` to check the current guild members
-• ${ACTIONS.LEADERBOARD} \`/leaderboard\` to view the standings
-• ${ACTIONS.FISHING} \`/fishing\` or \`/fishingwbait\` to continue your adventure
-• ${STATS.FISHERCOUNT} \`/fishercount\` to check how many fishers are at each spot`;
+• /guildmember to check the current guild members
+• /leaderboard to view the standings
+• /fishing or /fishingwbait to continue your adventure
+• /fishercount to check how many fishers are at each spot`;
       } else {
         // Create a new guild
         const guildName = interaction.options.getString("guildname");
@@ -1220,22 +1034,21 @@ Your options are:
         user.guild = newGuild._id;
         await user.save();
 
-        const { ACTIONS, MISC, STATS } = EMOJIS;
-        responseMessage = `${MISC.SUCCESS} You've established a guild "${guildName}" at ${ACTIONS.SPOT} Fishing Spot #${user.currentSpot}!
+        responseMessage = `You've established a guild "${guildName}" at Fishing Spot #${user.currentSpot}!
 
-${ACTIONS.GUILD} Guild Information:
+Guild Information:
 • Members (1/${newGuild.maxMembers}):
 1. <@${user.discordId}> (Host)
-• ${ACTIONS.SPOT} Fishing Spot: #${newGuild.spot}
-• ${ACTIONS.INVITE} Invite Code: ${inviteCode}
+• Fishing Spot: #${newGuild.spot}
+• Invite Code: ${inviteCode}
 
-${MISC.INFO} Share this invite code with others to invite them to your guild! Remember, if your guild has more members, your chances of catching better fish will increase!
+Share this invite code with others to invite them to your guild! Remember, if your guild has more members, your chances of catching better fish will increase!
 
 Your options now are:
-• ${ACTIONS.GUILD} \`/guildmember\` to check the current guild members
-• ${ACTIONS.LEADERBOARD} \`/leaderboard\` to view the standings
-• ${ACTIONS.FISHING} \`/fishing\` or \`/fishingwbait\` to continue your adventure
-• ${STATS.FISHERCOUNT} \`/fishercount\` to check how many fishers are at each spot`;
+• /guildmember to check the current guild members
+• /leaderboard to view the standings
+• /fishing or /fishingwbait to continue your adventure
+• /fishercount to check how many fishers are at each spot`;
       }
 
       await interaction.reply({
@@ -1245,10 +1058,6 @@ Your options now are:
       return true;
     } catch (error) {
       console.error("Error in handleInvite:", error);
-      await interaction.reply({
-        content: `${EMOJIS.MISC.FAIL} An error occurred while processing your request. Please try again later.`,
-        ephemeral: true,
-      });
       return false;
     }
   }
@@ -1301,16 +1110,6 @@ Your options now are:
         return true;
       }
 
-      // Check if the user's level allows them to join this pool
-      const maxJoinablePool = getMaxJoinablePool(user.level);
-      if (guild.spot > maxJoinablePool) {
-        await interaction.reply({
-          content: `Your current level (${user.level}) does not allow you to join this pool. You can only join pools up to Pool ${maxJoinablePool}.`,
-          ephemeral: true,
-        });
-        return true;
-      }
-
       // Store the current spot as previous spot before updating
       user.previousSpot = user.currentSpot || null;
       user.guild = guild._id;
@@ -1324,24 +1123,19 @@ Your options now are:
         currentSpot: guild.spot,
       });
 
-      const { ACTIONS, MISC, STATS } = EMOJIS;
-      const responseMessage = `${MISC.SUCCESS} You've joined the guild "${
+      const responseMessage = `You've joined the guild "${
         guild.name
-      }" at ${ACTIONS.SPOT} Fishing Spot #${guild.spot} with ${
+      }" at Fishing Spot #${guild.spot} with ${
         fisherCount - 1
       } other adventurers. Your fishing spot has been updated to match the guild's spot. If you leave the guild, you'll return to ${
         user.previousSpot ? `Spot #${user.previousSpot}` : "no specific spot"
-      }. ${
-        MISC.INFO
-      } Remember, the more guild members you have, the higher your chances of catching better fish!
+      }. Remember, the more guild members you have, the higher your chances of catching better fish!
 
 Your options:
-• ${ACTIONS.FISHING} \`/fishing\` to start fishing without bait
-• ${ACTIONS.BAIT} \`/fishingwbait\` to fish using bait for a higher chance
-• ${ACTIONS.GUILD} \`/guildmember\` to check your guild members
-• ${
-        STATS.FISHERCOUNT
-      } \`/fishercount\` to check how many fishers are at each spot`;
+• /fishing to start fishing without bait
+• /fishingwbait to fish using bait for a higher chance
+• /guildmember to check your guild members
+• /fishercount to check how many fishers are at each spot`;
 
       await interaction.reply({
         content: responseMessage,
@@ -1354,29 +1148,14 @@ Your options:
     }
   }
 
-  function getSpotDescription(spotNumber) {
-    const descriptions = [
-      `A calm bay with crystal clear waters.`,
-      `A rocky shoreline with crashing waves.`,
-      `A secluded cove surrounded by lush vegetation.`,
-      `A deep sea area known for its large fish.`,
-      `A tropical reef teeming with colorful marine life.`,
-      `A mysterious underwater cave system.`,
-    ];
-
-    const index = (spotNumber - 1) % descriptions.length;
-    return (
-      descriptions[index] || `${EMOJIS.ACTIONS.SPOT} Unknown fishing spot.`
-    );
-  }
-
   async function handleFisherCount(interaction) {
     try {
       const user = await User.findOne({ discordId: interaction.user.id });
 
       if (!user) {
         await interaction.reply({
-          content: `${EMOJIS.MISC.FAIL} You need to connect first. Use the \`/connect\` command to join the Infinite Seas.`,
+          content:
+            "You need to connect first. Use the `/connect` command to join the Infinite Seas.",
           ephemeral: true,
         });
         return true;
@@ -1387,26 +1166,15 @@ Your options:
         { $sort: { _id: 1 } },
       ]);
 
-      const { ACTIONS, MISC, STATS } = EMOJIS;
-      let responseMessage = `${STATS.FISHERCOUNT} Here's the current status of each fishing spot:\n\n`;
-
+      let responseMessage = "Here's the current status of each fishing spot:\n";
       fisherCounts.forEach((spot) => {
-        const spotEmoji = EMOJIS.SPOTS[spot._id] || EMOJIS.ACTIONS.SPOT;
-        const spotDescription = getSpotDescription(spot._id);
-        console.log(`Spot #${spot._id} description:`, spotDescription); // Add this line for debugging
-
-        // Remove the split and use the full description
-        responseMessage += `${spotEmoji} Spot #${spot._id} - ${spotDescription}\n`;
-        responseMessage += `   ${STATS.FISHERCOUNT} Fishers: ${spot.count}\n\n`;
+        responseMessage += `    Spot #${spot._id}: ${spot.count} fisher${
+          spot.count !== 1 ? "s" : ""
+        }\n`;
       });
 
-      responseMessage += `\n${MISC.INFO} Remember, the more fishers at a spot, the lower the probability of catching rare fish!`;
-
-      responseMessage += `\n\nYour options:
-• ${ACTIONS.SPOT} \`/findspot\` to move to a new fishing spot
-• ${ACTIONS.FISHING} \`/fishing\` or \`/fishingwbait\` to start fishing
-• ${ACTIONS.GUILD} \`/invite\` to create or manage your guild
-• ${ACTIONS.INVENTORY} \`/inventory\` to check your catches`;
+      responseMessage +=
+        "\nRemember, the more fishers at a spot, the lower the probability of catching rare fish!";
 
       await interaction.reply({
         content: responseMessage,
@@ -1415,10 +1183,6 @@ Your options:
       return true;
     } catch (error) {
       console.error("Error in handleFisherCount:", error);
-      await interaction.reply({
-        content: `${EMOJIS.MISC.FAIL} An error occurred while fetching fisher counts. Please try again later.`,
-        ephemeral: true,
-      });
       return false;
     }
   }
@@ -1537,7 +1301,7 @@ Your options:
 
       const responseMessage = `Your guild "${user.guild.name}":
 
-${EMOJIS.ACTIONS.GUILD} Guild Information:
+Guild Information:
 • Members (${guildMembers.length}/${user.guild.maxMembers}):
 ${memberList}
 • Fishing Spot: #${user.guild.spot}
@@ -1546,10 +1310,10 @@ ${memberList}
 Share this invite code with others to invite them to your guild!
 
 Your options:
-• ${EMOJIS.ACTIONS.LEADERBOARD} \`/leaderboard\` to view the standings
-• ${EMOJIS.ACTIONS.FISHING} \`/fishing\` or \`/fishingwbait\` to continue your adventure
-• ${EMOJIS.STATS.FISHERCOUNT} \`/fishercount\` to check how many fishers are at each spot
-• ${EMOJIS.ACTIONS.QUIT} \`/quitguild\` to leave the guild`;
+• /leaderboard to view the standings
+• /fishing or /fishingwbait to continue your adventure
+• /fishercount to check how many fishers are at each spot
+• /quitguild to leave the guild`;
 
       await interaction.reply({
         content: responseMessage,
@@ -1585,27 +1349,51 @@ Your options:
         return true;
       }
 
-      const guildName = user.guild.name;
-      const guildSpot = user.guild.spot;
+      const guild = user.guild;
+      const isHost = guild.host.equals(user._id);
 
-      // Remove user from the guild
+      if (isHost) {
+        // If the user is the host, disable the guild and remove all members
+        const guildMembers = await User.find({ guild: guild._id });
+
+        // Update all guild members
+        for (const member of guildMembers) {
+          member.guild = null;
+          member.currentSpot = member.previousSpot || null;
+          member.previousSpot = null;
+          await member.save();
+        }
+
+        // Disable the guild
+        guild.isActive = false;
+        guild.disbandedAt = new Date();
+        guild.members = [];
+        await guild.save();
+
+        await interaction.reply({
+          content: `As the host, you have disbanded the guild "${guild.name}". All members have been returned to their previous fishing spots.`,
+          ephemeral: true,
+        });
+        return true;
+      }
+
+      const guildName = user.guild.name;
       await Guild.updateOne(
         { _id: user.guild._id },
         { $pull: { members: user._id } }
       );
 
-      // Update user document
+      user.currentSpot = user.previousSpot;
+      user.previousSpot = null;
       user.guild = null;
-      if (user.previousSpot) {
-        user.currentSpot = user.previousSpot;
-        user.previousSpot = null;
-      }
-      // If previousSpot is null, keep the user at their current spot
       await user.save();
 
-      const { ACTIONS, MISC } = EMOJIS;
-      let responseMessage = `${MISC.SUCCESS} You have successfully left the guild "${guildName}". `;
-      responseMessage += `${ACTIONS.SPOT} You are now at Fishing Spot #${user.currentSpot}.`;
+      let responseMessage = `You have successfully left the guild "${guildName}". `;
+      if (user.currentSpot) {
+        responseMessage += `You have returned to Fishing Spot #${user.currentSpot}.`;
+      } else {
+        responseMessage += `You are not at any specific fishing spot. Use /findspot to find a new spot.`;
+      }
 
       await interaction.reply({
         content: responseMessage,
@@ -1614,78 +1402,6 @@ Your options:
       return true;
     } catch (error) {
       console.error("Error in handleQuitGuild:", error);
-      return false;
-    }
-  }
-
-  async function handleCreateFish(interaction) {
-    try {
-      const user = await User.findOne({
-        discordId: interaction.user.id,
-      }).populate("inventory.fishId");
-
-      if (!user) {
-        await interaction.reply({
-          content:
-            "You need to connect first. Use the `/connect` command to join the Infinite Seas.",
-          ephemeral: true,
-        });
-        return true;
-      }
-
-      const selectedRarity = interaction.options.getString("rarity");
-      const newName = interaction.options.getString("name");
-      const newImage = interaction.options.getString("image");
-
-      // Find the first non-customized fish of the selected rarity
-      const selectedFish = user.inventory.find(
-        (item) =>
-          item.fishId.rarity.toLowerCase() === selectedRarity &&
-          !item.fishId.customized
-      );
-
-      if (!selectedFish) {
-        await interaction.reply({
-          content: `You don't have any non-customized ${selectedRarity} fish in your inventory to customize.`,
-          ephemeral: true,
-        });
-        return true;
-      }
-
-      const fish = selectedFish.fishId;
-
-      // Create a new submitted fish entry
-      const submittedFish = new SubmittedFish({
-        userId: user._id,
-        originalFishId: fish._id,
-        name: newName,
-        image: newImage,
-        rarity: fish.rarity,
-      });
-
-      await submittedFish.save();
-
-      // Mark the original fish as customized
-      fish.customized = true;
-      await fish.save();
-
-      await interaction.reply({
-        content: `${EMOJIS.MISC.SUCCESS} The ancient magics of the sea heed your call! 
-${emoji} Your ${fish.rarity} ${fish.name} has been transformed into a creature of legend!
-${EMOJIS.ACTIONS.CUSTOMIZE} It shall henceforth be known as "${newName}"
-${EMOJIS.MISC.INFO} The Council of Tides will review your creation before it takes its place in the annals of the Infinite Seas.
-
-Use \`/inventory\` to view your customized fish.`,
-        ephemeral: true,
-      });
-      return true;
-    } catch (error) {
-      console.error("Error in handleCreateFish:", error);
-      await interaction.reply({
-        content:
-          "An error occurred while customizing your fish. Please try again later.",
-        ephemeral: true,
-      });
       return false;
     }
   }

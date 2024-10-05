@@ -19,6 +19,12 @@ const fishSchema = new mongoose.Schema({
   },
   pointValue: { type: Number, required: true },
   probability: { type: Number, required: true },
+  customized: { type: Boolean, default: false },
+  originalFishId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Fish",
+    default: null,
+  },
 });
 
 // Spot Schema
@@ -39,6 +45,7 @@ const userSchema = new mongoose.Schema({
   previousSpot: Number, // Add this line
   lastFishTime: Date,
   xp: { type: Number, default: 0 },
+  level: { type: Number, default: 1 },
   inventory: [
     {
       fishId: { type: mongoose.Schema.Types.ObjectId, ref: "Fish" },
@@ -51,6 +58,7 @@ const userSchema = new mongoose.Schema({
   },
   guild: { type: mongoose.Schema.Types.ObjectId, ref: "Guild" },
   lastFishingTime: { type: Date, default: null },
+  lastRerollTime: { type: Date, default: null },
 });
 
 // Guild Schema (if you decide to implement guilds)
@@ -65,10 +73,32 @@ const guildSchema = new mongoose.Schema({
   disbandedAt: { type: Date, default: null },
 });
 
+// Submitted Fish Schema
+const submittedFishSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  originalFishId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Fish",
+    required: true,
+  },
+  name: { type: String, required: true },
+  image: { type: String, required: true },
+  rarity: {
+    type: String,
+    enum: ["rare", "super rare", "epic", "legendary", "mythical"],
+    required: true,
+  },
+  submittedAt: { type: Date, default: Date.now },
+  approved: { type: Boolean, default: false },
+  approvedAt: { type: Date, default: null },
+});
+
+const SubmittedFish = mongoose.model("SubmittedFish", submittedFishSchema);
+
 // Create models
 const Fish = mongoose.model("Fish", fishSchema);
 const Spot = mongoose.model("Spot", spotSchema);
 const User = mongoose.model("User", userSchema);
 const Guild = mongoose.model("Guild", guildSchema);
 
-module.exports = { Fish, Spot, User, Guild };
+module.exports = { Fish, Spot, User, Guild, SubmittedFish };

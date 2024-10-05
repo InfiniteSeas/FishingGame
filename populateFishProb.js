@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { Fish, Spot } = require("./schemas");
+const poolDistributions = require("./poolDistributions");
 
 mongoose.connect(
   "mongodb+srv://sunil07t:K8lClGgNA4YJZk88@cluster0.hs60tch.mongodb.net/",
@@ -9,32 +10,54 @@ mongoose.connect(
 );
 
 const fishData = [
-  { name: "Common Fish", rarity: "common", pointValue: 10, probability: 0.5 },
   {
-    name: "Uncommon Fish",
+    name: "Spiny Pufferfish",
+    rarity: "common",
+    pointValue: 15,
+    probability: 0.5,
+    emoji: "🐡", // Pufferfish emoji
+  },
+  {
+    name: "Tropical Clownfish",
     rarity: "uncommon",
-    pointValue: 20,
+    pointValue: 30,
     probability: 0.25,
+    emoji: "🐠", // Tropical fish emoji
   },
-  { name: "Rare Fish", rarity: "rare", pointValue: 30, probability: 0.12 },
   {
-    name: "Super Rare Fish",
+    name: "Silver Herring",
+    rarity: "rare",
+    pointValue: 51,
+    probability: 0.12,
+    emoji: "🐟", // Generic fish emoji
+  },
+  {
+    name: "Great White Shark",
     rarity: "super rare",
-    pointValue: 40,
+    pointValue: 87,
     probability: 0.06,
+    emoji: "🦈", // Shark emoji
   },
-  { name: "Epic Fish", rarity: "epic", pointValue: 50, probability: 0.04 },
   {
-    name: "Legendary Fish",
+    name: "Blue Whale",
+    rarity: "epic",
+    pointValue: 147,
+    probability: 0.04,
+    emoji: "🐋", // Whale emoji
+  },
+  {
+    name: "Mythic Sea Dragon",
     rarity: "legendary",
-    pointValue: 60,
+    pointValue: 251,
     probability: 0.02,
+    emoji: "🐉", // Dragon emoji
   },
   {
-    name: "Mythical Fish",
+    name: "Celestial Starfish",
     rarity: "mythical",
-    pointValue: 70,
+    pointValue: 426,
     probability: 0.01,
+    emoji: "🌟", // Star emoji
   },
 ];
 
@@ -53,19 +76,26 @@ const populateSpots = async () => {
     await Spot.deleteMany({});
     const allFish = await Fish.find();
 
-    const baseQuantity = 1000000; // You can adjust this number as needed
+    const baseQuantity = 1000000; // 1M fish per pool
 
-    for (let i = 1; i <= 6; i++) {
-      const fishPopulation = allFish.map((fish) => {
-        const quantity = Math.round(baseQuantity * fish.probability);
-        return {
-          fish: fish._id,
-          quantity: quantity,
-        };
-      });
+    for (let poolData of poolDistributions) {
+      const fishPopulation = [];
+
+      for (let [rarity, probability] of Object.entries(poolData.distribution)) {
+        if (rarity !== "empty") {
+          const fish = allFish.find((f) => f.rarity.toLowerCase() === rarity);
+          if (fish) {
+            const quantity = Math.round(baseQuantity * probability);
+            fishPopulation.push({
+              fish: fish._id,
+              quantity: quantity,
+            });
+          }
+        }
+      }
 
       const spot = new Spot({
-        spotNumber: i,
+        spotNumber: poolData.poolNumber,
         fishPopulation: fishPopulation,
       });
 
