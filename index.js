@@ -378,7 +378,9 @@ fetchPolyfill().then(() => {
         const secondsLeft = Math.floor((timeLeft % 60000) / 1000);
         return {
           canFish: false,
-          message: `You need to wait ${minutesLeft} minute${
+          message: `${
+            EMOJIS.MISC.COOLDOWN
+          } You need to wait ${minutesLeft} minute${
             minutesLeft !== 1 ? "s" : ""
           } and ${secondsLeft} second${
             secondsLeft !== 1 ? "s" : ""
@@ -793,7 +795,8 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
       if (!user) {
         await interaction.reply({
           content:
-            "You need to connect first. Use the `/connect` command to join the fishing game.",
+            `${EMOJIS.MISC.LOCK} You need to connect first. Use the ` /
+            connect` command to join the fishing game.`,
           ephemeral: true,
         });
         return true;
@@ -803,7 +806,8 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
       if (!user.currentSpot) {
         await interaction.reply({
           content:
-            "You need to find a fishing spot first! Use `/findspot` to locate a spot.",
+            `${EMOJIS.MISC.SEA} You need to find a fishing spot first! Use ` /
+            findspot` to locate a spot.`,
           ephemeral: true,
         });
         return true;
@@ -813,7 +817,8 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
       if (!user.pendingCatch || !user.pendingCatch.fishId) {
         await interaction.reply({
           content:
-            "You don't have any fish on the line. Use `/fishing` to start fishing.",
+            `${EMOJIS.MISC.FISHING} You don't have any fish on the line. Use ` /
+            fishing` to start fishing.`,
           ephemeral: true,
         });
         return true;
