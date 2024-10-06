@@ -40,7 +40,7 @@ fetchPolyfill().then(() => {
   const commands = [
     new SlashCommandBuilder()
       .setName("connect")
-      .setDescription("Connect to the Infinite Seas game"),
+      .setDescription("Connect to the fishing game game"),
     new SlashCommandBuilder()
       .setName("findspot")
       .setDescription("Find a unique fishing spot"),
@@ -522,7 +522,7 @@ fetchPolyfill().then(() => {
 
       if (user) {
         await interaction.reply({
-          content: "You're already connected to the Infinite Seas!",
+          content: "You're already connected to the game!",
           ephemeral: true,
         });
         return true;
@@ -536,8 +536,23 @@ fetchPolyfill().then(() => {
 
       await user.save();
 
+      const { MISC, ACTIONS, STATS } = EMOJIS;
+      const welcomeMessage = `${MISC.SUCCESS} Welcome to the coastal village! ${MISC.SEA}
+
+${MISC.INFO} Chapter 1: The Quiet Life of Fishing
+
+You've joined a simple life in a peaceful coastal village. ${ACTIONS.FISHING} Here, you'll spend your days fishing with companions, casting lines into the sea under the warm sun. The gentle waves and bobbing boats create a serene atmosphere as you gaze out at the horizon, waiting for your catch.
+
+Your journey begins now:
+• ${ACTIONS.SPOT} Use \`/findspot\` to choose your fishing spot
+• ${ACTIONS.FISHING} Start fishing with \`/fishing\` or \`/fishingwbait\`
+• ${ACTIONS.INVENTORY} Check your catches with \`/inventory\`
+• ${STATS.XP} Track your progress with \`/exp\`
+
+${MISC.TIME} As you fish and explore, you'll uncover the secrets of the sea. Good luck on your adventure!`;
+
       await interaction.reply({
-        content: `Welcome to the Infinite Seas ${EMOJIS.MISC.SEA} - You're now ready to start your fishing adventure. Use  \`/findspot\` to locate your first fishing spot!`,
+        content: welcomeMessage,
         ephemeral: true,
       });
       return true;
@@ -557,7 +572,7 @@ fetchPolyfill().then(() => {
       if (!user) {
         await interaction.reply({
           content:
-            "You need to connect first. Use the `/connect` command to join the Infinite Seas.",
+            "You need to connect first. Use the `/connect` command to join the fishing game.",
           ephemeral: true,
         });
         return true;
@@ -642,7 +657,7 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
       if (!user) {
         await interaction.reply({
           content:
-            "You need to connect first. Use the `/connect` command to join the Infinite Seas.",
+            "You need to connect first. Use the `/connect` command to join the fishing game.",
           ephemeral: true,
         });
         return true;
@@ -778,7 +793,7 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
       if (!user) {
         await interaction.reply({
           content:
-            "You need to connect first. Use the `/connect` command to join the Infinite Seas.",
+            "You need to connect first. Use the `/connect` command to join the fishing game.",
           ephemeral: true,
         });
         return true;
@@ -899,7 +914,7 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
         if (newLevel === 30) {
           levelUpMessage += `\n\n＼(＾O＾)／ MAX LEVEL! ＼(＾O＾)／\n\n`;
           levelUpMessage += `You've reached the pinnacle of fishing mastery - Level 30!\n`;
-          levelUpMessage += `Your name will be forever etched in the annals of the Infinite Seas.\n`;
+          levelUpMessage += `Your name will be forever etched in the annals of the fishing game.\n`;
           levelUpMessage += `The Council of Tides bows to your unparalleled skill and dedication.\n`;
           levelUpMessage += `May your legend inspire fisherfolk for generations to come!`;
         }
@@ -957,6 +972,9 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
         replyMessage += ` ${MISC.INFO} (Includes guild bonus XP!)`;
       }
 
+      // Add the guild information directly to the message
+      replyMessage += `\n\n${MISC.INFO} Remember: Joining guilds and getting 5/5 members increases your XP when fishing with others and gets you to higher pools faster!`;
+
       if (levelUpMessage) {
         replyMessage += `\n${ACTIONS.LEVEL_UP} ${levelUpMessage}`;
       }
@@ -996,7 +1014,7 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
       if (!user) {
         await interaction.reply({
           content:
-            "You need to connect first. Use the `/connect` command to join the Infinite Seas.",
+            "You need to connect first. Use the `/connect` command to join the fishing game.",
           ephemeral: true,
         });
         return true;
@@ -1050,7 +1068,7 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
       if (!user) {
         await interaction.reply({
           content:
-            "You need to connect first. Use the `/connect` command to join the Infinite Seas.",
+            "You need to connect first. Use the `/connect` command to join the fishing game.",
           ephemeral: true,
         });
         return true;
@@ -1132,7 +1150,7 @@ ${STATS.LEVEL} Current Level: ${user.level}`;
       if (!user) {
         await interaction.reply({
           content:
-            "You need to connect first. Use the `/connect` command to join the Infinite Seas.",
+            "You need to connect first. Use the `/connect` command to join the fishing game.",
           ephemeral: true,
         });
         return true;
@@ -1156,33 +1174,19 @@ ${STATS.LEVEL} Current Level: ${user.level}`;
       if (!user) {
         await interaction.reply({
           content:
-            "You need to connect first. Use the `/connect` command to join the Infinite Seas.",
+            "You need to connect first. Use the `/connect` command to join the game.",
           ephemeral: true,
         });
         return true;
       }
 
-      let storyMessage = `Welcome to the Infinite Seas ${EMOJIS.MISC.SEA} - a vast and mysterious ocean teeming with countless fish species waiting to be discovered. As an adventurous fisher, your journey begins in the calm waters of Pool 1, where you'll hone your skills and learn the basics of fishing.
+      const { MISC, STATS } = EMOJIS;
+      const storyMessage = `${MISC.LOCK} The story feature will be available when you reach Level 25. 
 
-As you gain experience and level up, you'll unlock access to new, more challenging pools:
-• Pools 1 & 2: Available from Level 1
-• Pool 3: Unlocks at Level 5
-• Pool 4: Unlocks at Level 10
-• Pool 5: Unlocks at Level 15
-• Pool 6: Unlocks at Level 20
+${STATS.LEVEL} Your current level: ${user.level}
+${STATS.XP} XP needed for Level 25: ${levels[24].xp}
 
-Each pool offers unique fish species and increased chances of rare catches. Remember, you can always return to previous pools or join guilds in pools slightly above your level for added challenge and rewards.
-
-Your current level: ${user.level}
-`;
-
-      if (user.level >= 25) {
-        storyMessage += `\nCongratulations on reaching Level 25! You've now unlocked the ability to create your own pools. Use the /createpool command to start shaping the Infinite Seas and leave your mark on this vast ocean. (Feature coming soon)`;
-      } else {
-        storyMessage += `\nAt Level 25, you'll unlock the ability to create your own pools, allowing you to shape the Infinite Seas and leave your mark on this vast ocean. Keep fishing and leveling up!`;
-      }
-
-      storyMessage += `\n\nAs you progress, you'll discover rare fish, form powerful guilds, and uncover the secrets hidden beneath the waves. Will you become a legendary fisher, known throughout the Infinite Seas? The adventure awaits!`;
+${MISC.INFO} Keep fishing and leveling up to unlock this feature!`;
 
       await interaction.reply({
         content: storyMessage,
@@ -1208,7 +1212,7 @@ Your current level: ${user.level}
 
       if (!user) {
         await interaction.reply({
-          content: `${EMOJIS.MISC.FAIL} You need to connect first. Use the \`/connect\` command to join the Infinite Seas.`,
+          content: `${EMOJIS.MISC.FAIL} You need to connect first. Use the \`/connect\` command to join the fishing game.`,
           ephemeral: true,
         });
         return true;
@@ -1312,7 +1316,7 @@ Your options now are:
       if (!user) {
         await interaction.reply({
           content:
-            "You need to connect first. Use the `/connect` command to join the Infinite Seas.",
+            "You need to connect first. Use the `/connect` command to join the fishing game.",
           ephemeral: true,
         });
         return true;
@@ -1428,7 +1432,7 @@ Your options:
 
       if (!user) {
         await interaction.reply({
-          content: `${EMOJIS.MISC.FAIL} You need to connect first. Use the \`/connect\` command to join the Infinite Seas.`,
+          content: `${EMOJIS.MISC.FAIL} You need to connect first. Use the \`/connect\` command to join the fishing game.`,
           ephemeral: true,
         });
         return true;
@@ -1482,7 +1486,7 @@ Your options:
       if (!user) {
         await interaction.reply({
           content:
-            "You need to connect first. Use the `/connect` command to join the Infinite Seas.",
+            "You need to connect first. Use the `/connect` command to join the fishing game.",
           ephemeral: true,
         });
         return true;
@@ -1562,7 +1566,7 @@ Your options:
       if (!user) {
         await interaction.reply({
           content:
-            "You need to connect first. Use the `/connect` command to join the Infinite Seas.",
+            "You need to connect first. Use the `/connect` command to join the fishing game.",
           ephemeral: true,
         });
         return true;
@@ -1623,7 +1627,7 @@ Your options:
       if (!user) {
         await interaction.reply({
           content:
-            "You need to connect first. Use the `/connect` command to join the Infinite Seas.",
+            "You need to connect first. Use the `/connect` command to join the fishing game.",
           ephemeral: true,
         });
         return true;
@@ -1678,7 +1682,7 @@ Your options:
 
       if (!user) {
         await interaction.reply({
-          content: `${EMOJIS.MISC.FAIL} You need to connect first. Use the \`/connect\` command to join the Infinite Seas.`,
+          content: `${EMOJIS.MISC.FAIL} You need to connect first. Use the \`/connect\` command to join the fishing game.`,
           ephemeral: true,
         });
         return true;
