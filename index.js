@@ -587,7 +587,7 @@ fetchPolyfill().then(() => {
   
 Your options:
 • ${EMOJIS.ACTIONS.FISHING} \`/fishing\` to cast your line without bait
-��� ${EMOJIS.ACTIONS.BAIT} \`/fishingwbait\` to fish using one of your fish as bait for a higher chance
+• ${EMOJIS.ACTIONS.BAIT} \`/fishingwbait\` to fish using one of your fish as bait for a higher chance
 • ${EMOJIS.ACTIONS.INVITE} \`/invite\` to create a guild at this spot
 • ${EMOJIS.ACTIONS.GUILD} \`/join\` to move to another fisher's spot (if invited)
 • ${EMOJIS.STATS.FISHERCOUNT} \`/fishercount\` to check how many fishers are at each spot`,
@@ -604,7 +604,7 @@ Your options:
         availablePools[Math.floor(Math.random() * availablePools.length)];
       user.previousSpot = user.currentSpot;
       user.currentSpot = newSpot;
-      user.lastSpotChangeTime = Date.now();
+      user.lastRerollTime = Date.now();
       await user.save();
 
       const spotDescription = getSpotDescription(newSpot);
@@ -635,8 +635,9 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
     try {
       let user = await User.findOne({
         discordId: interaction.user.id,
-      }).populate("inventory.fishId");
-      console.log("User found for fishing:", user ? "Yes" : "No");
+      })
+        .populate("inventory.fish")
+        .populate("guild");
 
       if (!user) {
         await interaction.reply({
@@ -656,7 +657,6 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
         return true;
       }
 
-      // Check if the user is already fishing
       if (user.pendingCatch && user.pendingCatch.fishId) {
         await interaction.reply({
           content:
@@ -673,7 +673,7 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
         for (let i = 1; i <= numBaits; i++) {
           const bait = interaction.options.getString(`bait${i}`);
           if (bait) {
-            baitRarities.push(bait);
+            baitRarities.push(bait.toLowerCase());
           }
         }
 
@@ -687,11 +687,7 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
 
         for (let bait of baitRarities) {
           const baitFishIndex = user.inventory.findIndex(
-            (item) =>
-              item.fishId &&
-              item.fishId.rarity &&
-              item.fishId.rarity.toLowerCase() === bait &&
-              item.quantity > 0
+            (item) => item.fish.rarity.toLowerCase() === bait
           );
 
           if (baitFishIndex === -1) {
@@ -703,10 +699,7 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
           }
 
           // Remove one fish of the bait rarity from the user's inventory
-          user.inventory[baitFishIndex].quantity -= 1;
-          if (user.inventory[baitFishIndex].quantity === 0) {
-            user.inventory.splice(baitFishIndex, 1);
-          }
+          user.inventory.splice(baitFishIndex, 1);
         }
         await user.save();
         console.log(
@@ -821,33 +814,51 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
         return true;
       }
 
-      console.log("Attempting to find fish with ID:", user.pendingCatch.fishId);
-      const caughtFish = await Fish.findById(user.pendingCatch.fishId);
-      console.log("Found fish:", caughtFish);
+      const spot = await Spot.findOne({
+        spotNumber: user.currentSpot,
+      }).populate("fishPopulation.fish");
 
-      if (!caughtFish) {
-        console.error(
-          `Failed to retrieve fish with ID: ${user.pendingCatch.fishId}`
-        );
+      if (!spot || spot.fishPopulation.length === 0) {
         user.pendingCatch = null;
         await user.save();
         await interaction.reply({
           content:
-            "An error occurred while retrieving the fish. Please try fishing again.",
+            "This pool is empty. Try finding a new spot with `/findspot`!",
           ephemeral: true,
         });
         return true;
       }
 
-      // Add the caught fish to the user's inventory
-      const inventoryItem = user.inventory.find((item) =>
-        item.fishId.equals(caughtFish._id)
-      );
-      if (inventoryItem) {
-        inventoryItem.quantity += 1;
-      } else {
-        user.inventory.push({ fishId: caughtFish._id, quantity: 1 });
+      const caughtFish = await Fish.findById(user.pendingCatch.fishId);
+      console.log("Found fish:", caughtFish);
+
+      if (!caughtFish) {
+        const fishInSpot = spot.fishPopulation.some((fp) => fp.quantity > 0);
+        if (fishInSpot) {
+          user.pendingCatch = null;
+          await user.save();
+          await interaction.reply({
+            content:
+              "The fish got away! But don't worry, there are still fish in this spot. Try fishing again!",
+            ephemeral: true,
+          });
+        } else {
+          user.pendingCatch = null;
+          await user.save();
+          await interaction.reply({
+            content:
+              "The fish got away, and it seems this spot is now empty. Try finding a new spot with `/findspot`!",
+            ephemeral: true,
+          });
+        }
+        return true;
       }
+
+      // Add the caught fish to the user's inventory as a unique entry
+      user.inventory.push({
+        fish: caughtFish._id,
+        caughtAt: new Date(),
+      });
 
       // Calculate XP for the caught fish
       let xpGained = caughtFish.pointValue;
@@ -867,35 +878,48 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
       }
 
       // Add XP to user
-      const oldXP = user.xp;
       user.xp += xpGained;
 
       // Calculate new level
       let newLevel = user.level;
-      while (newLevel < levels.length && user.xp >= levels[newLevel].xp) {
+      while (
+        newLevel < levels.length &&
+        user.xp >= levels[newLevel].xp &&
+        newLevel < 30
+      ) {
         newLevel++;
       }
 
       // Check if user leveled up
       let levelUpMessage = "";
       if (newLevel > user.level) {
-        levelUpMessage = `Congratulations! You've leveled up to level ${newLevel}!`;
         user.level = newLevel;
+        levelUpMessage = `Congratulations! You've leveled up to level ${newLevel}!`;
+
+        if (newLevel === 30) {
+          levelUpMessage += `\n\n＼(＾O＾)／ MAX LEVEL! ＼(＾O＾)／\n\n`;
+          levelUpMessage += `You've reached the pinnacle of fishing mastery - Level 30!\n`;
+          levelUpMessage += `Your name will be forever etched in the annals of the Infinite Seas.\n`;
+          levelUpMessage += `The Council of Tides bows to your unparalleled skill and dedication.\n`;
+          levelUpMessage += `May your legend inspire fisherfolk for generations to come!`;
+        }
       }
 
       // Calculate XP needed for next level
-      const currentLevelXP = levels[user.level - 1].xp;
-      const nextLevelXP =
-        user.level < levels.length
-          ? levels[user.level].xp
-          : levels[levels.length - 1].xp;
-      const xpForNextLevel = nextLevelXP - user.xp;
-
-      // Calculate progress bar
-      const progressBar = generateProgressBar(
-        user.xp - currentLevelXP,
-        nextLevelXP - currentLevelXP
-      );
+      let xpForNextLevel = 0;
+      let progressBar = "";
+      if (user.level < 30) {
+        const currentLevelXP = levels[user.level - 1].xp;
+        const nextLevelXP =
+          user.level < levels.length
+            ? levels[user.level].xp
+            : levels[levels.length - 1].xp;
+        xpForNextLevel = nextLevelXP - user.xp;
+        progressBar = generateProgressBar(
+          user.xp - currentLevelXP,
+          nextLevelXP - currentLevelXP
+        );
+      }
 
       // Calculate points needed for next pool
       const nextPoolLevel = Math.ceil(user.level / 5) * 5;
@@ -910,7 +934,6 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
       console.log("User saved after catching fish and updating XP/level");
 
       // Decrease the fish population in the spot
-      const spot = await Spot.findOne({ spotNumber: user.currentSpot });
       console.log("Spot found:", spot ? "Yes" : "No");
       if (spot) {
         const fishIndex = spot.fishPopulation.findIndex((f) =>
@@ -939,17 +962,16 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
       }
 
       replyMessage += `\n\n${STATS.LEVEL} Current Level: ${user.level}`;
-      replyMessage += `\n${MISC.PROGRESS} Progress: ${progressBar} (${
-        user.xp - currentLevelXP
-      }/${nextLevelXP - currentLevelXP})`;
-      replyMessage += `\n${
-        MISC.TIME
-      } You are ${xpForNextLevel} XP away from level ${user.level + 1}.`;
-
-      if (xpForNextPool > 0) {
+      if (user.level < 30) {
+        replyMessage += `\n${MISC.PROGRESS} Progress: ${progressBar} (${
+          user.xp - levels[user.level - 1].xp
+        }/${levels[user.level].xp - levels[user.level - 1].xp})`;
+        replyMessage += `\n${
+          MISC.TIME
+        } You are ${xpForNextLevel} XP away from level ${user.level + 1}.`;
         replyMessage += `\n${ACTIONS.SPOT} You are ${xpForNextPool} XP away from unlocking the next pool at level ${nextPoolLevel}.`;
       } else {
-        replyMessage += `\n${MISC.SUCCESS} You have unlocked all available pools!`;
+        replyMessage += `\n${MISC.SUCCESS} You've reached the maximum level! Keep fishing to maintain your legendary status!`;
       }
 
       await interaction.reply({
@@ -1023,7 +1045,7 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
     try {
       const user = await User.findOne({
         discordId: interaction.user.id,
-      }).populate("inventory.fishId");
+      }).populate("inventory.fish");
 
       if (!user) {
         await interaction.reply({
@@ -1043,18 +1065,48 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
       }
 
       const { FISH, ACTIONS, STATS } = EMOJIS;
-      const inventoryList = user.inventory
-        .map((item, index) => {
-          const emoji = FISH[item.fishId.rarity.toLowerCase()] || "";
-          return `${index + 1}. ${emoji} ${item.fishId.rarity} ${
-            item.fishId.name
-          } (x${item.quantity})`;
+
+      // Group fish by type
+      const groupedInventory = user.inventory.reduce((acc, item) => {
+        const key = `${item.fish.rarity}|${item.fish.name}`;
+        if (!acc[key]) {
+          acc[key] = {
+            fish: item.fish,
+            count: 0,
+            customizedCount: 0,
+          };
+        }
+        acc[key].count++;
+        if (item.customized) {
+          acc[key].customizedCount++;
+        }
+        return acc;
+      }, {});
+
+      // Create inventory list
+      const inventoryList = Object.values(groupedInventory)
+        .map((group, index) => {
+          const emoji = FISH[group.fish.rarity.toLowerCase()] || "";
+          let line = `${index + 1}. ${emoji} ${group.fish.rarity} ${
+            group.fish.name
+          } (x${group.count})`;
+
+          if (group.customizedCount > 0) {
+            line += ` (${group.customizedCount} customized)`;
+          }
+
+          return line;
         })
         .join("\n");
+
+      const totalFish = user.inventory.length;
+      const uniqueTypes = Object.keys(groupedInventory).length;
 
       const inventoryMessage = `${ACTIONS.INVENTORY} Your Inventory:
 ${inventoryList}
 
+${STATS.FISHBUCKET} Total Fish: ${totalFish}
+${STATS.LEVEL} Unique Fish Types: ${uniqueTypes}
 ${STATS.XP} Total XP: ${user.xp}
 ${STATS.LEVEL} Current Level: ${user.level}`;
 
@@ -1622,68 +1674,72 @@ Your options:
     try {
       const user = await User.findOne({
         discordId: interaction.user.id,
-      }).populate("inventory.fishId");
+      }).populate("inventory.fish");
 
       if (!user) {
         await interaction.reply({
-          content:
-            "You need to connect first. Use the `/connect` command to join the Infinite Seas.",
+          content: `${EMOJIS.MISC.FAIL} You need to connect first. Use the \`/connect\` command to join the Infinite Seas.`,
           ephemeral: true,
         });
         return true;
       }
 
-      const selectedRarity = interaction.options.getString("rarity");
+      const selectedRarity = interaction.options
+        .getString("rarity")
+        .toLowerCase();
       const newName = interaction.options.getString("name");
       const newImage = interaction.options.getString("image");
 
-      // Find the first non-customized fish of the selected rarity
-      const selectedFish = user.inventory.find(
+      // Find all non-customized fish of the selected rarity
+      const availableFish = user.inventory.filter(
         (item) =>
-          item.fishId.rarity.toLowerCase() === selectedRarity &&
-          !item.fishId.customized
+          item.fish.rarity.toLowerCase() === selectedRarity && !item.customized
       );
 
-      if (!selectedFish) {
+      if (availableFish.length === 0) {
+        const customizedCount = user.inventory.filter(
+          (item) =>
+            item.fish.rarity.toLowerCase() === selectedRarity && item.customized
+        ).length;
+        const totalCount = user.inventory.filter(
+          (item) => item.fish.rarity.toLowerCase() === selectedRarity
+        ).length;
+
         await interaction.reply({
-          content: `You don't have any non-customized ${selectedRarity} fish in your inventory to customize.`,
+          content: `${EMOJIS.MISC.WARNING} You have customized ${customizedCount} out of ${totalCount} ${selectedRarity} fish. Catch more ${selectedRarity} fish to customize!`,
           ephemeral: true,
         });
         return true;
       }
 
-      const fish = selectedFish.fishId;
+      // Select the first available fish
+      const selectedFish = availableFish[0];
+
+      // Update the fish in the user's inventory
+      selectedFish.customized = true;
+      selectedFish.customName = newName;
+      selectedFish.customImage = newImage;
+      await user.save();
 
       // Create a new submitted fish entry
       const submittedFish = new SubmittedFish({
         userId: user._id,
-        originalFishId: fish._id,
+        originalFishId: selectedFish.fish._id,
         name: newName,
         image: newImage,
-        rarity: fish.rarity,
+        rarity: selectedFish.fish.rarity,
       });
-
       await submittedFish.save();
 
-      // Mark the original fish as customized
-      fish.customized = true;
-      await fish.save();
-
       await interaction.reply({
-        content: `${EMOJIS.MISC.SUCCESS} The ancient magics of the sea heed your call! 
-${emoji} Your ${fish.rarity} ${fish.name} has been transformed into a creature of legend!
-${EMOJIS.ACTIONS.CUSTOMIZE} It shall henceforth be known as "${newName}"
-${EMOJIS.MISC.INFO} The Council of Tides will review your creation before it takes its place in the annals of the Infinite Seas.
-
-Use \`/inventory\` to view your customized fish.`,
+        content: `${EMOJIS.MISC.SUCCESS} Your ${selectedFish.fish.rarity} ${selectedFish.fish.name} has been submitted for customization as "${newName}". The Council of Tides will review your creation soon.`,
         ephemeral: true,
       });
       return true;
     } catch (error) {
       console.error("Error in handleCreateFish:", error);
       await interaction.reply({
-        content:
-          "An error occurred while customizing your fish. Please try again later.",
+        content: `${EMOJIS.MISC.FAIL} An error occurred while customizing your fish. Please try again later.`,
         ephemeral: true,
       });
       return false;

@@ -23,6 +23,7 @@ const EMOJIS = {
     XP: "✨",
     LEVEL: "🏆",
     FISHERCOUNT: "🚣‍♂️",
+    FISHBUCKET: "🪣",
   },
   MISC: {
     SUCCESS: "✅",

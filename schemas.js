@@ -19,7 +19,6 @@ const fishSchema = new mongoose.Schema({
   },
   pointValue: { type: Number, required: true },
   probability: { type: Number, required: true },
-  customized: { type: Boolean, default: false },
   originalFishId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Fish",
@@ -42,14 +41,17 @@ const spotSchema = new mongoose.Schema({
 const userSchema = new mongoose.Schema({
   discordId: { type: String, required: true, unique: true },
   currentSpot: Number,
-  previousSpot: Number, // Add this line
+  previousSpot: Number,
   lastFishTime: Date,
   xp: { type: Number, default: 0 },
   level: { type: Number, default: 1 },
   inventory: [
     {
-      fishId: { type: mongoose.Schema.Types.ObjectId, ref: "Fish" },
-      quantity: Number,
+      fish: { type: mongoose.Schema.Types.ObjectId, ref: "Fish" },
+      customized: { type: Boolean, default: false },
+      customName: { type: String, default: null },
+      customImage: { type: String, default: null },
+      caughtAt: { type: Date, default: Date.now },
     },
   ],
   pendingCatch: {
