@@ -35,6 +35,7 @@ const EMOJIS = {
     TIME: "⏳",
     COOLDOWN: "🕒",
     PROGRESS: "🔥",
+    LOCK: "🔒",
   },
   SPOTS: {
     1: "🌊✨", // Calm bay with crystal clear waters (sunrise over water)
