@@ -568,13 +568,39 @@ ${MISC.TIME} As you fish and explore, you'll uncover the secrets of the sea. Goo
 
   async function handleFindSpot(interaction) {
     try {
-      let user = await User.findOne({ discordId: interaction.user.id });
+      let user = await User.findOne({
+        discordId: interaction.user.id,
+      }).populate("guild");
       console.log("User found for findspot:", user ? "Yes" : "No");
 
       if (!user) {
         await interaction.reply({
           content:
             "You need to connect first. Use the `/connect` command to join the fishing game.",
+          ephemeral: true,
+        });
+        return true;
+      }
+
+      // Check if user is in a guild
+      if (user.guild) {
+        let currentSpotDescription = getSpotDescription(user.currentSpot);
+        let currentFisherCount = await User.countDocuments({
+          currentSpot: user.currentSpot,
+        });
+
+        await interaction.reply({
+          content: `${EMOJIS.MISC.WARNING} You can't change your spot while you're in a guild. 
+  
+Your current location: ${EMOJIS.ACTIONS.SPOT} Fishing Spot #${user.currentSpot}: ${currentSpotDescription} 
+There are ${currentFisherCount} fishers here (including you).
+
+Your options:
+• ${EMOJIS.ACTIONS.FISHING} \`/fishing\` to cast your line without bait
+• ${EMOJIS.ACTIONS.BAIT} \`/fishingwbait\` to fish using one of your fish as bait for a higher chance
+• ${EMOJIS.ACTIONS.GUILD} \`/guildmember\` to check your guild members
+• ${EMOJIS.STATS.FISHERCOUNT} \`/fishercount\` to check how many fishers are at each spot
+• ${EMOJIS.ACTIONS.QUITGUILD} \`/quitguild\` to leave your guild and be able to change spots`,
           ephemeral: true,
         });
         return true;
@@ -599,9 +625,9 @@ ${MISC.TIME} As you fish and explore, you'll uncover the secrets of the sea. Goo
         await interaction.reply({
           content: `You can't change your spot for another ${hoursLeft} hours and ${minutesLeft} minutes. 
   
-  You're currently at Fishing Spot #${user.currentSpot}: ${currentSpotDescription} 
-  There are ${currentFisherCount} fishers here (including you).
-  
+You're currently at Fishing Spot #${user.currentSpot}: ${currentSpotDescription} 
+There are ${currentFisherCount} fishers here (including you).
+
 Your options:
 • ${EMOJIS.ACTIONS.FISHING} \`/fishing\` to cast your line without bait
 • ${EMOJIS.ACTIONS.BAIT} \`/fishingwbait\` to fish using one of your fish as bait for a higher chance
@@ -867,7 +893,7 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
         return true;
       }
 
-      // Add the caught fish to the user's inventory as a unique entry
+      // Add the caught fish to the user's inventory
       user.inventory.push({
         fish: caughtFish._id,
         caughtAt: new Date(),
@@ -988,6 +1014,25 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
         replyMessage += `\n${ACTIONS.SPOT} You are ${xpForNextPool} XP away from unlocking the next pool at level ${nextPoolLevel}.`;
       } else {
         replyMessage += `\n${MISC.SUCCESS} You've reached the maximum level! Keep fishing to maintain your legendary status!`;
+      }
+
+      // Add general hints
+      replyMessage += `\n\n${MISC.INFO} Available commands:
+• ${ACTIONS.FISHING} \`/fishing\` to fish without bait
+• ${ACTIONS.BAIT} \`/fishingwbait\` to fish with bait
+• ${ACTIONS.SPOT} \`/findspot\` to change your fishing spot
+• ${ACTIONS.INVENTORY} \`/inventory\` to check your catches`;
+
+      // Add /createfish hint for Rare or higher rarity fish
+      const rareRarities = [
+        "rare",
+        "super rare",
+        "epic",
+        "legendary",
+        "mythical",
+      ];
+      if (rareRarities.includes(caughtFish.rarity.toLowerCase())) {
+        replyMessage += `\n\n${MISC.STAR} You caught a rare fish! Use \`/createfish\` to create a custom fish based on your rare catch!`;
       }
 
       await interaction.reply({
