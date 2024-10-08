@@ -1648,7 +1648,7 @@ Your options:
 • ${EMOJIS.ACTIONS.LEADERBOARD} \`/leaderboard\` to view the standings
 • ${EMOJIS.ACTIONS.FISHING} \`/fishing\` or \`/fishingwbait\` to continue your adventure
 • ${EMOJIS.STATS.FISHERCOUNT} \`/fishercount\` to check how many fishers are at each spot
-• ${EMOJIS.ACTIONS.QUIT} \`/quitguild\` to leave the guild`;
+• ${EMOJIS.MISC.FAIL} \`/quitguild\` to leave the guild`;
 
       await interaction.reply({
         content: responseMessage,
