@@ -600,7 +600,7 @@ Your options:
 • ${EMOJIS.ACTIONS.BAIT} \`/fishingwbait\` to fish using one of your fish as bait for a higher chance
 • ${EMOJIS.ACTIONS.GUILD} \`/guildmember\` to check your guild members
 • ${EMOJIS.STATS.FISHERCOUNT} \`/fishercount\` to check how many fishers are at each spot
-• ${EMOJIS.ACTIONS.QUITGUILD} \`/quitguild\` to leave your guild and be able to change spots`,
+• ${EMOJIS.MISC.FAIL} \`/quitguild\` to leave your guild and be able to change spots`,
           ephemeral: true,
         });
         return true;
