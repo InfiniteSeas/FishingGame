@@ -1167,7 +1167,7 @@ ${MISC.TIME} Remember, you can find a new spot again in 12 hours.`;
 ${inventoryList}
 
 ${STATS.FISHBUCKET} Total Fish: ${totalFish}
-${STATS.LEVEL} Unique Fish Types: ${uniqueTypes}
+${STATS.GEM} Unique Fish Types: ${uniqueTypes}
 ${STATS.XP} Total XP: ${user.xp}
 ${STATS.LEVEL} Current Level: ${user.level}`;
 
